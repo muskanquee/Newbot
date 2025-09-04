@@ -3,14 +3,13 @@ const { cmd } = require('../command');
 const { ytsearch } = require('@dark-yasiya/yt-dl.js');
 
 // MP4 video download
-
 cmd({ 
     pattern: "mp4", 
     alias: ["video"], 
     react: "🎥", 
     desc: "Download YouTube video", 
     category: "main", 
-    use: '.mp4 < Yt url or Name >', 
+    use: '.mp4 <YouTube URL or video name>', 
     filename: __filename 
 }, async (conn, mek, m, { from, prefix, quoted, q, reply }) => { 
     try { 
@@ -25,8 +24,9 @@ cmd({
         let response = await fetch(apiUrl);
         let data = await response.json();
         
-        if (data.status !== 200 || !data.success || !data.result.download_url) {
-            return reply("Failed to fetch the video. Please try again later.");
+        // Check if API is working
+        if (!data || data.status !== 200 || !data.success || !data.result || !data.result.download_url) {
+            return reply("API error: Unable to fetch video. The API might be down or expired.");
         }
 
         let ytmsg = `📹 *Video Downloader*
@@ -50,19 +50,18 @@ cmd({
 
     } catch (e) {
         console.log(e);
-        reply("An error occurred. Please try again later.");
+        reply("An error occurred while processing your request. Please try again later.");
     }
 });
 
 // MP3 song download 
-
 cmd({ 
     pattern: "song", 
     alias: ["play", "mp3"], 
     react: "🎶", 
     desc: "Download YouTube song", 
     category: "main", 
-    use: '.song <query>', 
+    use: '.song <song name or YouTube link>', 
     filename: __filename 
 }, async (conn, mek, m, { from, sender, reply, q }) => { 
     try {
@@ -77,28 +76,31 @@ cmd({
         const res = await fetch(apiUrl);
         const data = await res.json();
 
-        if (!data?.result?.downloadUrl) return reply("Download failed. Try again later.");
-
-    await conn.sendMessage(from, {
-    audio: { url: data.result.downloadUrl },
-    mimetype: "audio/mpeg",
-    fileName: `${song.title}.mp3`,
-    contextInfo: {
-        externalAdReply: {
-            title: song.title.length > 25 ? `${song.title.substring(0, 22)}...` : song.title,
-            body: "Join our WhatsApp Channel",
-            mediaType: 1,
-            thumbnailUrl: song.thumbnail.replace('default.jpg', 'hqdefault.jpg'),
-            sourceUrl: 'https://whatsapp.com/channel/0029Vb5dDVO59PwTnL86j13J',
-            mediaUrl: 'https://whatsapp.com/channel/0029Vb5dDVO59PwTnL86j13J',
-            showAdAttribution: true,
-            renderLargerThumbnail: true
+        // Check if API is working
+        if (!data || !data.result || !data.result.downloadUrl) {
+            return reply("API error: Unable to fetch audio. The API might be down or expired.");
         }
-    }
-}, { quoted: mek });
+
+        await conn.sendMessage(from, {
+            audio: { url: data.result.downloadUrl },
+            mimetype: "audio/mpeg",
+            fileName: `${song.title.substring(0, 30)}.mp3`,
+            contextInfo: {
+                externalAdReply: {
+                    title: song.title.length > 25 ? `${song.title.substring(0, 22)}...` : song.title,
+                    body: "Join our WhatsApp Channel",
+                    mediaType: 1,
+                    thumbnailUrl: song.thumbnail.replace('default.jpg', 'hqdefault.jpg'),
+                    sourceUrl: 'https://whatsapp.com/channel/0029Vb5dDVO59PwTnL86j13J',
+                    mediaUrl: 'https://whatsapp.com/channel/0029Vb5dDVO59PwTnL86j13J',
+                    showAdAttribution: true,
+                    renderLargerThumbnail: true
+                }
+            }
+        }, { quoted: mek });
 
     } catch (error) {
         console.error(error);
-        reply("An error occurred. Please try again.");
+        reply("An error occurred while processing your request. Please try again.");
     }
 });
