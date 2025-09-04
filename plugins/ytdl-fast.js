@@ -10,7 +10,7 @@ function replaceYouTubeID(url) {
 }
 
 cmd({
-    pattern: "play",
+    pattern: "play3",
     alias: ["mp3", "ytmp3"],
     react: "🎵",
     desc: "Download Ytmp3",
@@ -32,16 +32,21 @@ cmd({
         const data = await dy_scrap.ytsearch(`https://youtube.com/watch?v=${id}`);
         if (!data?.results?.length) return await reply("❌ Failed to fetch video!");
 
-        const { title } = data.results[0];
+        const { title, image } = data.results[0];
+
+        const msg = await conn.sendMessage(from, { text: "⏳ Processing audio download..." }, { quoted: mek });
         const response = await dy_scrap.ytmp3(`https://youtube.com/watch?v=${id}`);
+        
         let downloadUrl = response?.result?.download?.url;
-        
         if (!downloadUrl) return await reply("❌ Download link not found!");
-        
+
         await conn.sendMessage(from, { 
             audio: { url: downloadUrl }, 
-            mimetype: "audio/mpeg" 
+            mimetype: "audio/mpeg",
+            fileName: `${title}.mp3`
         }, { quoted: mek });
+        
+        await conn.sendMessage(from, { text: '✅ Audio Download Successful ✅', edit: msg.key });
 
     } catch (error) {
         console.error(error);
