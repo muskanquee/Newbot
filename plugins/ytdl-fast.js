@@ -1,56 +1,104 @@
 const config = require('../config');
 const { cmd } = require('../command');
-const DY_SCRAP = require('@dark-yasiya/scrap');
-const dy_scrap = new DY_SCRAP();
+const { ytsearch } = require('@dark-yasiya/yt-dl.js');
 
-function replaceYouTubeID(url) {
-    const regex = /(?:youtube\.com\/(?:.*v=|.*\/)|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
-    const match = url.match(regex);
-    return match ? match[1] : null;
-}
+// MP4 video download
 
-cmd({
-    pattern: "play",
-    alias: ["song", "play2"],
-    react: "🎵",
-    desc: "Download Ytmp3",
-    category: "download",
-    use: ".song <Text or YT URL>",
-    filename: __filename
-}, async (conn, m, mek, { from, q, reply }) => {
-    try {
-        if (!q) return await reply("❌ Please provide a Query or Youtube URL!");
-
-        let id = q.startsWith("https://") ? replaceYouTubeID(q) : null;
-
-        if (!id) {
-            const searchResults = await dy_scrap.ytsearch(q);
-            if (!searchResults?.results?.length) return await reply("❌ No results found!");
-            id = searchResults.results[0].videoId;
+cmd({ 
+    pattern: "mp4", 
+    alias: ["video"], 
+    react: "🎥", 
+    desc: "Download YouTube video", 
+    category: "main", 
+    use: '.mp4 < Yt url or Name >', 
+    filename: __filename 
+}, async (conn, mek, m, { from, prefix, quoted, q, reply }) => { 
+    try { 
+        if (!q) return await reply("Please provide a YouTube URL or video name.");
+        
+        const yt = await ytsearch(q);
+        if (yt.results.length < 1) return reply("No results found!");
+        
+        let yts = yt.results[0];  
+        let apiUrl = `https://apis.davidcyriltech.my.id/download/ytmp4?url=${encodeURIComponent(yts.url)}`;
+        
+        let response = await fetch(apiUrl);
+        let data = await response.json();
+        
+        if (data.status !== 200 || !data.success || !data.result.download_url) {
+            return reply("Failed to fetch the video. Please try again later.");
         }
 
-        const data = await dy_scrap.ytsearch(`https://youtube.com/watch?v=${id}`);
-        if (!data?.results?.length) return await reply("❌ Failed to fetch video!");
+        let ytmsg = `📹 *Video Downloader*
+🎬 *Title:* ${yts.title}
+⏳ *Duration:* ${yts.timestamp}
+👀 *Views:* ${yts.views}
+👤 *Author:* ${yts.author.name}
+🔗 *Link:* ${yts.url}
+> 𝐸𝑅𝐹𝒜𝒩 𝒜𝐻𝑀𝒜𝒟 ❤️`;
 
-        const { title, image } = data.results[0];
+        // Send video directly with caption
+        await conn.sendMessage(
+            from, 
+            { 
+                video: { url: data.result.download_url }, 
+                caption: ytmsg,
+                mimetype: "video/mp4"
+            }, 
+            { quoted: mek }
+        );
 
-        const msg = await conn.sendMessage(from, { text: "⏳ Processing audio download..." }, { quoted: mek });
-        const response = await dy_scrap.ytmp3(`https://youtube.com/watch?v=${id}`);
+    } catch (e) {
+        console.log(e);
+        reply("An error occurred. Please try again later.");
+    }
+});
+
+// MP3 song download 
+
+cmd({ 
+    pattern: "song", 
+    alias: ["play", "mp3"], 
+    react: "🎶", 
+    desc: "Download YouTube song", 
+    category: "main", 
+    use: '.song <query>', 
+    filename: __filename 
+}, async (conn, mek, m, { from, sender, reply, q }) => { 
+    try {
+        if (!q) return reply("Please provide a song name or YouTube link.");
+
+        const yt = await ytsearch(q);
+        if (!yt.results.length) return reply("No results found!");
+
+        const song = yt.results[0];
+        const apiUrl = `https://api.princetechn.com/api/download/ytmp3?url=${encodeURIComponent(song.url)}`;
         
-        let downloadUrl = response?.result?.download?.url;
-        if (!downloadUrl) return await reply("❌ Download link not found!");
+        const res = await fetch(apiUrl);
+        const data = await res.json();
 
-        await conn.sendMessage(from, { 
-            audio: { url: downloadUrl }, 
-            mimetype: "audio/mpeg",
-            fileName: `${title}.mp3`
-        }, { quoted: mek });
-        
-        await conn.sendMessage(from, { text: '✅ Audio Download Successful ✅', edit: msg.key });
+        if (!data?.result?.downloadUrl) return reply("Download failed. Try again later.");
+
+    await conn.sendMessage(from, {
+    audio: { url: data.result.downloadUrl },
+    mimetype: "audio/mpeg",
+    fileName: `${song.title}.mp3`,
+    contextInfo: {
+        externalAdReply: {
+            title: song.title.length > 25 ? `${song.title.substring(0, 22)}...` : song.title,
+            body: "Join our WhatsApp Channel",
+            mediaType: 1,
+            thumbnailUrl: song.thumbnail.replace('default.jpg', 'hqdefault.jpg'),
+            sourceUrl: 'https://whatsapp.com/channel/0029Vb5dDVO59PwTnL86j13J',
+            mediaUrl: 'https://whatsapp.com/channel/0029Vb5dDVO59PwTnL86j13J',
+            showAdAttribution: true,
+            renderLargerThumbnail: true
+        }
+    }
+}, { quoted: mek });
 
     } catch (error) {
         console.error(error);
-        await conn.sendMessage(from, { react: { text: '❌', key: mek.key } });
-        await reply(`❌ *An error occurred:* ${error.message || "Error!"}`);
+        reply("An error occurred. Please try again.");
     }
 });
